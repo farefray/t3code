@@ -17,7 +17,7 @@ export type WslServerTreeResult =
 const MARKER_FILE_NAME = "t3code-wsl-server-tree.json";
 const COPY_CONCURRENCY = 8;
 
-const Marker = Schema.Struct({ version: Schema.String });
+const Marker = Schema.Struct({ version: Schema.String, serverRoot: Schema.String });
 const decodeMarker = Schema.decodeUnknownEffect(Schema.fromJsonString(Marker));
 const encodeMarker = Schema.encodeEffect(Schema.fromJsonString(Marker));
 
@@ -117,7 +117,8 @@ export const make = Effect.gen(function* () {
   const markerMatches = Effect.gen(function* () {
     const raw = yield* fs.readFileString(join(versionDir, MARKER_FILE_NAME));
     const marker = yield* decodeMarker(raw);
-    return marker.version === version;
+    // Local immutable releases can share an app version but carry different native dependencies.
+    return marker.version === version && marker.serverRoot === serverRoot;
   }).pipe(Effect.orElseSucceed(() => false));
 
   const extract = Effect.gen(function* () {
@@ -130,7 +131,7 @@ export const make = Effect.gen(function* () {
     });
     yield* Effect.gen(function* () {
       yield* copyTree(fs, join, serverRoot, partialDir);
-      const markerJson = yield* encodeMarker({ version });
+      const markerJson = yield* encodeMarker({ version, serverRoot });
       yield* fs.writeFileString(join(partialDir, MARKER_FILE_NAME), `${markerJson}\n`);
       yield* fs.remove(versionDir, { recursive: true }).pipe(Effect.ignore);
       yield* fs.rename(partialDir, versionDir);

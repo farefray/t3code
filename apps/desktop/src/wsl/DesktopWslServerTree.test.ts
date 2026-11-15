@@ -207,6 +207,47 @@ describe("DesktopWslServerTree", () => {
     ).pipe(Effect.provide(NodeServices.layer)),
   );
 
+  it.effect.each(["legacy marker", "different release"])(
+    "refreshes a same-version extraction with a %s",
+    (previousSource) =>
+      withTempDir((tempDir) =>
+        Effect.gen(function* () {
+          const fileSystem = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const resourcesPath = path.join(tempDir, "new-release", "resources");
+          const serverRoot = path.join(resourcesPath, "server.asar");
+          const nativeFile = "node_modules/@yuuang/ffi-rs-linux-x64-gnu/ffi-rs.linux-x64-gnu.node";
+          yield* fileSystem.makeDirectory(path.dirname(path.join(serverRoot, nativeFile)), {
+            recursive: true,
+          });
+          yield* fileSystem.writeFileString(path.join(serverRoot, nativeFile), "linux-native");
+          const versionDir = path.join(tempDir, "userdata", "wsl-server-tree", "1.2.3");
+          yield* fileSystem.makeDirectory(versionDir, { recursive: true });
+          yield* fileSystem.writeFileString(
+            path.join(versionDir, "t3code-wsl-server-tree.json"),
+            JSON.stringify({
+              version: "1.2.3",
+              ...(previousSource === "different release"
+                ? { serverRoot: path.join(tempDir, "old-release", "resources", "server.asar") }
+                : {}),
+            }),
+          );
+
+          const result = yield* ensureWith({ baseDir: tempDir, resourcesPath });
+
+          assert.isTrue(result.ok);
+          assert.equal(
+            yield* fileSystem.readFileString(path.join(versionDir, nativeFile)),
+            "linux-native",
+          );
+          const marker = JSON.parse(
+            yield* fileSystem.readFileString(path.join(versionDir, "t3code-wsl-server-tree.json")),
+          );
+          assert.equal(marker.serverRoot, serverRoot);
+        }),
+      ).pipe(Effect.provide(NodeServices.layer)),
+  );
+
   it.effect("sweeps stale version directories and leftover partials after extraction", () =>
     withTempDir((tempDir) =>
       Effect.gen(function* () {

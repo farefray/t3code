@@ -1579,6 +1579,7 @@ const stageClerkPasskeyNativeBinaries = Effect.fn("stageClerkPasskeyNativeBinari
 export function createStageWorkspaceConfig(input: {
   readonly platform: typeof BuildPlatform.Type;
   readonly arch: typeof BuildArch.Type;
+  readonly includeWsl?: boolean;
   readonly allowBuilds?: Record<string, boolean>;
   readonly patchedDependencies?: Record<string, string>;
   readonly overrides?: Record<string, string>;
@@ -1586,18 +1587,13 @@ export function createStageWorkspaceConfig(input: {
   const { platform, arch, allowBuilds, patchedDependencies, overrides } = input;
   const hostOs = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
   const hostCpu = arch === "universal" ? ["arm64", "x64"] : [arch];
-  // Linux AppImages require glibc native optional dependencies; tell pnpm explicitly.
-  const supportedArchitectures =
-    platform === "linux"
-      ? {
-          os: [hostOs],
-          cpu: hostCpu,
-          libc: ["glibc"],
-        }
-      : {
-          os: [hostOs],
-          cpu: hostCpu,
-        };
+  // The mounted Windows server fallback also needs Linux native optional dependencies.
+  const includeWsl = platform === "win" && input.includeWsl === true;
+  const supportedArchitectures = {
+    os: includeWsl ? [hostOs, "linux"] : [hostOs],
+    cpu: hostCpu,
+    ...(platform === "linux" || includeWsl ? { libc: ["glibc"] } : {}),
+  };
 
   return {
     supportedArchitectures,
@@ -3130,6 +3126,7 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
     ...createStageWorkspaceConfig({
       platform: "win",
       arch: input.arch,
+      includeWsl: true,
       allowBuilds: input.allowBuilds,
       patchedDependencies: sidecarPatchedDependencies,
       overrides: input.overrides,

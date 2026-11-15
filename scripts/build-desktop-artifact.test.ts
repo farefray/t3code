@@ -29,6 +29,7 @@ import {
   parseWslRuntimeArchiveMembers,
   readWorkspaceConfig,
   createBuildConfig,
+  createStageWorkspaceConfig,
   DESKTOP_FILE_EXCLUSIONS,
   InvalidMacPasskeyRpDomainError,
   InvalidMacPasskeyPublishableKeyError,
@@ -738,6 +739,23 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }
   });
 
+  it.each(["x64", "arm64"] as const)(
+    "stages Linux optional native dependencies for the Windows %s server fallback only",
+    (arch) => {
+      const windowsOnly = createStageWorkspaceConfig({ platform: "win", arch });
+      assert.deepStrictEqual(windowsOnly.supportedArchitectures, {
+        os: ["win32"],
+        cpu: [arch],
+      });
+      const server = createStageWorkspaceConfig({ platform: "win", arch, includeWsl: true });
+      assert.deepStrictEqual(server.supportedArchitectures, {
+        os: ["win32", "linux"],
+        cpu: [arch],
+        libc: ["glibc"],
+      });
+    },
+  );
+
   it.effect("unpacks target Windows natives while excluding the other architecture", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -754,6 +772,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64/OpenConsole.exe",
           "node_modules/node-pty/prebuilds/win32-x64/pty.node",
           "node_modules/node-pty/prebuilds/linux-x64/pty.node",
+          "node_modules/@yuuang/ffi-rs-linux-x64-gnu/ffi-rs.linux-x64-gnu.node",
         ];
 
         for (const nativeFile of nativeFiles) {
@@ -786,6 +805,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           extractFile(
             asarPath,
             path.join("node_modules", "node-pty", "prebuilds", "linux-x64", "pty.node"),
+          ).toString(),
+          "\x7fELF",
+        );
+        assert.equal(
+          extractFile(
+            asarPath,
+            "node_modules/@yuuang/ffi-rs-linux-x64-gnu/ffi-rs.linux-x64-gnu.node",
           ).toString(),
           "\x7fELF",
         );
