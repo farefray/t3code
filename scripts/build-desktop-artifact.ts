@@ -1061,7 +1061,8 @@ export function resolveWindowsServerAsarIgnoreGlobs(arch: typeof BuildArch.Type)
   ];
 }
 
-export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 100;
+// The sidecar also ships Linux natives for the mounted WSL fallback (~120 files).
+export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 150;
 export const WINDOWS_SERVER_RESOURCE_SOURCE_DIR = "apps/desktop/prod-resources/windows-server";
 export const WINDOWS_SERVER_EXTRA_RESOURCES = [
   {
